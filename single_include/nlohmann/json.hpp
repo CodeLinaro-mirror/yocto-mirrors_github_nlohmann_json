@@ -12248,9 +12248,10 @@ class binary_reader
         {
             if (!container_stack.empty())
             {
-                // the reference is not held across parse_cbor_value() below,
-                // which can push onto the stack and reallocate it
-                container_frame& top = container_stack.back();
+                // a copy, not a reference: it must stay valid across the
+                // pop_back() below, which destroys the container_stack element
+                // it would otherwise alias
+                container_frame top = container_stack.back();
                 bool at_end = false;
 
                 if (top.remaining != npos)
@@ -12261,7 +12262,7 @@ class binary_reader
                     if (!at_end)
                     {
                         // claim the element about to be read
-                        --top.remaining;
+                        --container_stack.back().remaining;
                         if (top.is_object)
                         {
                             get();
@@ -12280,9 +12281,8 @@ class binary_reader
 
                 if (at_end)
                 {
-                    const bool is_object = top.is_object;
                     container_stack.pop_back();
-                    if (JSON_HEDLEY_UNLIKELY(is_object ? !sax->end_object() : !sax->end_array()))
+                    if (JSON_HEDLEY_UNLIKELY(top.is_object ? !sax->end_object() : !sax->end_array()))
                     {
                         return false;
                     }
